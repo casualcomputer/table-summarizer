@@ -384,11 +384,11 @@ server = function(input, output,session) {
                 dbClearResult(res) #clear outputs 
                 dbDisconnect(con)
                 
-                output_tableNUMVALUES=scales::comma(as.integer(output_table$NUMVALUES))
-                output_tableFREQNULL=scales::comma(as.integer(output_table$FREQNULL))
-                output_tableNUMMINVALS=scales::comma(as.integer(output_table$NUMMINVALS))
-                output_tableNUMMAXVALS=scales::comma(as.integer(output_table$NUMMAXVALS))
-                output_tableNUMUNIQUES=scales::comma(as.integer(output_table$NUMUNIQUES))
+                output_table$NUMVALUES=scales::comma(as.integer(output_table$NUMVALUES))
+                output_table$FREQNULL=scales::comma(as.integer(output_table$FREQNULL))
+                output_table$NUMMINVALS=scales::comma(as.integer(output_table$NUMMINVALS))
+                output_table$NUMMAXVALS=scales::comma(as.integer(output_table$NUMMAXVALS))
+                output_table$NUMUNIQUES=scales::comma(as.integer(output_table$NUMUNIQUES))
                 
                 if (input$checkMode == "advanced"){
                     

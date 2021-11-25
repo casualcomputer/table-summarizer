@@ -386,6 +386,8 @@ server = function(input, output,session) {
                 
                 output_table$NUMVALUES=scales::comma(as.integer(output_table$NUMVALUES))
                 output_table$FREQNULL=scales::comma(as.integer(output_table$FREQNULL))
+                output_table$MINVAL=scales::comma(as.integer(output_table$MINVAL))
+                output_table$MAXVAL=scales::comma(as.integer(output_table$MAXVAL))
                 output_table$NUMMINVALS=scales::comma(as.integer(output_table$NUMMINVALS))
                 output_table$NUMMAXVALS=scales::comma(as.integer(output_table$NUMMAXVALS))
                 output_table$NUMUNIQUES=scales::comma(as.integer(output_table$NUMUNIQUES))

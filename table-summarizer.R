@@ -4,10 +4,12 @@ new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"
 if(length(new.packages)) install.packages(new.packages, type="binary",dependencies=TRUE)
 
 
-# Part 1: Create helper functions that generate SQL queries 
+# Part 1: Create helper functions that generate SQL queries ----
 # most up-to-date codes: https://github.com/casualcomputer/sql.mechanic
 
-#' Generate SQL codes used to summarize tables
+
+# FUN: get_summary_codes ----
+#' Generate SQL codes used to summarize tables ----
 #' @param target_path Path to the table
 #' @param show_codes character string: option to print the codes
 #' @param type character string: choice of basic or advanced summary
@@ -16,41 +18,41 @@ if(length(new.packages)) install.packages(new.packages, type="binary",dependenci
 
 get_summary_codes <- function(target_path, show_codes=FALSE, type="basic", dbtype="Netezza", 
                               quote_table_name=FALSE, clipboard_enabled=TRUE){
+  
+  target_path <- gsub("\\[|\\]","",target_path) #get rid of opening/closing square brackets in the [db].[schema].[table] notation.
+  db_path <- unlist(strsplit(target_path,"\\.")) #split on period to make a vector of length 3
+  if (length(db_path)!=3){
     
-    target_path <- gsub("\\[|\\]","",target_path) #get rid of opening/closing square brackets in the [db].[schema].[table] notation.
-    db_path <- unlist(strsplit(target_path,"\\.")) #split on period to make a vector of length 3
-    if (length(db_path)!=3){
-        
-        stop("The path of the table has an invalid format. Example of a valid format: 'DATABASE_NAME.SCHEMA_NAME.TABLE_NAME'")
-        
-    }
+    stop("The path of the table has an invalid format. Example of a valid format: 'DATABASE_NAME.SCHEMA_NAME.TABLE_NAME'")
+    
+  }
+  
+  
+  if (!(dbtype %in% c("Netezza", "MSSQL"))){
+    
+    stop("Currently, you can only generate SQL codes for 'Netezza' and 'MSSQL' databases. More updates are coming...")
+    
+  }
+  
+  if (!(type %in% c("basic","advanced"))){
+    
+    stop("Input 'type' is invalid.\nReminder: type='basic' is the short summary and type='advanced' is the more detailed summary.")
+    
+  }
+  
+  
+  db_name <- db_path[1] #database name
+  schema_name <- db_path[2] #schema name
+  table_name <-  db_path[3] #table name
+  
+  
+  if(type=="basic"& dbtype=="Netezza"){
     
     
-    if (!(dbtype %in% c("Netezza", "MSSQL"))){
-        
-        stop("Currently, you can only generate SQL codes for 'Netezza' and 'MSSQL' databases. More updates are coming...")
-        
-    }
+    if (quote_table_name){ table_name_quoted = paste0("\'\"",table_name,"\"\'")} else {
+      table_name_quoted = paste0("\'",table_name,"\'")}
     
-    if (!(type %in% c("basic","advanced"))){
-        
-        stop("Input 'type' is invalid.\nReminder: type='basic' is the short summary and type='advanced' is the more detailed summary.")
-        
-    }
-    
-    
-    db_name <- db_path[1] #database name
-    schema_name <- db_path[2] #schema name
-    table_name <-  db_path[3] #table name
-    
-    
-    if(type=="basic"& dbtype=="Netezza"){
-        
-        
-        if (quote_table_name){ table_name_quoted = paste0("\'\"",table_name,"\"\'")} else {
-            table_name_quoted = paste0("\'",table_name,"\'")}
-        
-        sql_codes <- paste0(" SELECT REPLACE(REPLACE(REPLACE(
+    sql_codes <- paste0(" SELECT REPLACE(REPLACE(REPLACE(
                         '<start> SELECT ''<col>'' as colname,
                         COUNT(*) as numvalues,
                         MAX(freqnull) as freqnull,
@@ -73,16 +75,16 @@ get_summary_codes <- function(target_path, show_codes=FALSE, type="basic", dbtyp
                         else column_name end as column_name  , ordinal_position
                         FROM information_schema.columns
                         WHERE table_name =","'",table_name,"'",") a;")
-    }
+  }
+  
+  
+  if(type=="advanced"&dbtype=="Netezza"){
     
     
-    if(type=="advanced"&dbtype=="Netezza"){
-        
-        
-        if (quote_table_name){ table_name_quoted = paste0("\'\"",table_name,"\"\'")} else {
-            table_name_quoted = paste0("\'",table_name,"\'")}
-        
-        sql_codes <-  paste0("SELECT REPLACE(REPLACE(REPLACE(
+    if (quote_table_name){ table_name_quoted = paste0("\'\"",table_name,"\"\'")} else {
+      table_name_quoted = paste0("\'",table_name,"\'")}
+    
+    sql_codes <-  paste0("SELECT REPLACE(REPLACE(REPLACE(
                          '<start> SELECT ''<col>'' as colname,
                          COUNT(*) as numvalues,
                          MAX(freqnull) as freqnull,
@@ -116,16 +118,16 @@ get_summary_codes <- function(target_path, show_codes=FALSE, type="basic", dbtyp
                          else column_name end as column_name
                          FROM information_schema.columns
                          WHERE table_name = ","'",table_name,"'",") a;")
-        
-    }
     
+  }
+  
+  
+  if(type=="basic"& dbtype=="MSSQL"){
     
-    if(type=="basic"& dbtype=="MSSQL"){
-        
-        if (quote_table_name){ table_name_quoted = paste0("\'\"",table_name,"\"\'")} else {
-            table_name_quoted = paste0("\'",table_name,"\'")}
-        
-        sql_codes <-  paste0("
+    if (quote_table_name){ table_name_quoted = paste0("\'\"",table_name,"\"\'")} else {
+      table_name_quoted = paste0("\'",table_name,"\'")}
+    
+    sql_codes <-  paste0("
                          SELECT REPLACE(REPLACE(REPLACE('<start> SELECT ''<col>'' as colname,
                          COUNT(*) as numvalues, MAX(freqnull) as freqnull, CAST(MIN(minval) as
                          VARCHAR) as minval, SUM(CASE WHEN <col> = minval THEN freq ELSE 0 END)
@@ -141,19 +143,19 @@ get_summary_codes <- function(target_path, show_codes=FALSE, type="basic", dbtyp
                          (CASE WHEN ordinal_position = 1 THEN ''
                          ELSE 'UNION ALL' END)) as CODES_DATA_SUMMARY
                          FROM (", "SELECT table_name, case when column_name like ","'",'%[\\.]%',"'",
-                             " then concat(","'",'"',"'",",column_name,","'", '"' ,"'",")",
-                             " else column_name end as column_name, ordinal_position",
-                             " FROM information_schema.columns
+                         " then concat(","'",'"',"'",",column_name,","'", '"' ,"'",")",
+                         " else column_name end as column_name, ordinal_position",
+                         " FROM information_schema.columns
                          WHERE table_name = ", "'",table_name,"'",") a;")
-    }
+  }
+  
+  
+  if(type=="advanced" & dbtype=="MSSQL"){
     
+    if (quote_table_name){ table_name_quoted = paste0("\'\"",table_name,"\"\'")} else {
+      table_name_quoted = paste0("\'",table_name,"\'")}
     
-    if(type=="advanced" & dbtype=="MSSQL"){
-        
-        if (quote_table_name){ table_name_quoted = paste0("\'\"",table_name,"\"\'")} else {
-            table_name_quoted = paste0("\'",table_name,"\'")}
-        
-        sql_codes <-  paste0("
+    sql_codes <-  paste0("
                          SELECT REPLACE(REPLACE(REPLACE(
                          '<start> SELECT ''<col>'' as colname,
                          COUNT(*) as numvalues,
@@ -184,23 +186,33 @@ get_summary_codes <- function(target_path, show_codes=FALSE, type="basic", dbtyp
                          (CASE WHEN ordinal_position = 1 THEN ''
                          ELSE 'UNION ALL' END)) as CODES_DATA_SUMMARY
                          FROM ( ", "SELECT table_name, case when column_name like ","'",'%[\\.]%',"'",
-                             " then concat(","'",'"',"'",",column_name,","'", '"' ,"'",")",
-                             " else column_name end as column_name, ordinal_position" ,
-                             " FROM information_schema.columns
+                         " then concat(","'",'"',"'",",column_name,","'", '"' ,"'",")",
+                         " else column_name end as column_name, ordinal_position" ,
+                         " FROM information_schema.columns
                          WHERE table_name = ","'",table_name,"'",") a;")
-        
-    }
     
-    if(show_codes==TRUE){
-        cat(sql_codes)
-        cat(rep('\n',5))#print codes
-    }
-    
-    if (clipboard_enabled) {writeClipboard(sql_codes)} #copy to clipboard, if the clipboard option is enabled
-    
-    return(sql_codes) #return SQL texts
-    
+  }
+  
+  if(show_codes==TRUE){
+    cat(sql_codes)
+    cat(rep('\n',5))#print codes
+  }
+  
+  if (clipboard_enabled) {writeClipboard(sql_codes)} #copy to clipboard, if the clipboard option is enabled
+  
+  return(sql_codes) #return SQL texts
+  
 }
+
+# # FUN: reformat_num 
+# # add commas to output table 
+# reformat_num = function(x){
+#   if(is.numeric(as.numeric(x))){return(comma(as.numeric(x)))} 
+#   else {return(x)}
+# }
+
+
+
 
 
 
@@ -210,11 +222,12 @@ library(shiny)
 library(shinyWidgets)
 
 
-# Define UI for application that draws a histogram
+# Define UI for application ----
+
 ui = fluidPage(
-    
-    # Note the wrapping of the string in HTML()
-    tags$style(HTML("
+  
+  # CSS----
+  tags$style(HTML("
                   /* Change input texts*/
                   label,h3 {
                   font-family: monospace;
@@ -253,186 +266,188 @@ ui = fluidPage(
                   #margin-top: 10px;
                   background: rgb(255,255,255);
                   background: linear-gradient(90deg, rgba(255,255,255,1) 0%, rgba(208,208,208,0.3309698879551821) 74%);
-  }
-                  
-                  .selectize-control { 
-                  width: 45em;
-                  }
+}
 
-                  .selectize-dropdown-content { 
-                  font-size: 0.85em;
-                  }
-                  
-                  ")), 
-    
-    
-    # dynamic title: https://stackoverflow.com/questions/47896844/shiny-dynamically-change-tab-names 
-    
-    fluidRow(id= "row1", column(1, textInput("odbc_source", h3("ODBC Input"))),
-             column(5, uiOutput("schema_name_tables")),
-             column(2,  radioButtons("checkMode", "Mode", list("Basic"="basic" ,"Advanced"="advanced"))),
-             column(2,  radioButtons("checkQuote", "\"Table Name\"", list("No" = FALSE,  "Yes"=TRUE ))),
-             column(2,  radioButtons("checkDbtype", "Database",
-                                     list("Netezza" = "Netezza", "SQL Server" = "MSSQL")
-             )
-             )
-    ),
-    fluidRow(addSpinner(DT::dataTableOutput("summary_table"), spin = "circle", color = "#3498db")) 
-    
-)
+.selectize-control { 
+width: 35em;
+}
+.selectize-dropdown-content { 
+font-size: 0.85em;
+}
 
-# Define server logic 
+")), 
+  
+  
+  # dynamic title: https://stackoverflow.com/questions/47896844/shiny-dynamically-change-tab-names 
+  
+  fluidRow(id= "row1", column(1, textInput("odbc_source", h3("ODBC Input"))),
+           column(5, uiOutput("schema_name_tables")),
+           column(2,  radioButtons("checkMode", "Mode", list("Basic"="basic" ,"Advanced"="advanced"))),
+           column(2,  radioButtons("checkQuote", "\"Table Name\"", list("No" = FALSE,  "Yes"=TRUE ))),
+           column(2,  radioButtons("checkDbtype", "Database",
+                                   list("Netezza" = "Netezza", "SQL Server" = "MSSQL")
+           )
+           )
+  ),
+  fluidRow(addSpinner(DT::dataTableOutput("summary_table"), spin = "circle", color = "#3498db")) 
+  
+  )
+
+# Define server logic ----
 
 server = function(input, output,session) {
-    
-    library(odbc)
-    library(DBI)
-    library(scales)
-    library(DT)
-    
-    # number of rows
-    output$num_rows =  renderText({
-        con =   dbConnect(odbc::odbc(),  input$odbc_source, encoding = 'windows-1252') 
-        res = dbSendQuery(con, paste("select count(*) as cnt from", input$odbc_table_name))
-        num_rows = dbFetch(res)
-        print(num_rows)
-        num_rows= as.data.frame(num_rows)$CNT 
-        print(num_rows)
+  
+  library(odbc)
+  library(DBI)
+  library(scales)
+  library(DT)
+  
+  # number of rows -----
+  output$num_rows =  renderText({
+    con =   dbConnect(odbc::odbc(),  input$odbc_source, encoding = 'windows-1252') 
+    res = dbSendQuery(con, paste("select count(*) as cnt from", input$odbc_table_name))
+    num_rows = dbFetch(res)
+    print(num_rows)
+    num_rows= as.data.frame(num_rows)$CNT 
+    print(num_rows)
+    dbClearResult(res)
+    dbDisconnect(con)
+    scales::comma(num_rows) 
+  }) 
+  
+  # drop-down list for database, schema and table  ----
+  output$schema_name_tables = renderUI({
+    if (nchar(input$odbc_source)>0){
+      
+      con =   tryCatch({ dbConnect(odbc::odbc(),  input$odbc_source, encoding = 'windows-1252')
+      }, error = function(e) {message(paste("Unable to connect to ODBC!")) })
+      
+      res =   tryCatch({ dbSendQuery(con, "select distinct TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME from INFORMATION_SCHEMA.TABLES")
+      }, error = function(e) {message(paste("Cannot load information schemas!")) })
+      
+      list_of_schemas =   tryCatch({ as.data.frame(dbFetch(res));
+      }, error = function(e) {message(paste("Cannot load information schemas!")) })
+      
+      if (!is.null(res)){
         dbClearResult(res)
+      }
+      
+      if (!is.null(con)){
         dbDisconnect(con)
-        scales::comma(num_rows) 
-    }) 
+      }
+      
+      selectInput(inputId = "odbc_table_name", label = h3("Table Input"), 
+                  choices = c("'No tables selected'",paste0(list_of_schemas$TABLE_CATALOG,".",list_of_schemas$TABLE_SCHEMA,"." ,list_of_schemas$TABLE_NAME)),
+                  selected = NULL)
+      
+    } 
     
-    # database name, schema name and table name 
-    output$schema_name_tables = renderUI({
-        if (nchar(input$odbc_source)>0){
-            
-            con =   tryCatch({ dbConnect(odbc::odbc(),  input$odbc_source, encoding = 'windows-1252')
-            }, error = function(e) {message(paste("Unable to connect to ODBC!")) })
-            
-            res =   tryCatch({ dbSendQuery(con, "select distinct TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME from INFORMATION_SCHEMA.TABLES")
-            }, error = function(e) {message(paste("Cannot load information schemas!")) })
-            
-            list_of_schemas =   tryCatch({ as.data.frame(dbFetch(res));
-            }, error = function(e) {message(paste("Cannot load information schemas!")) })
-            
-            if (!is.null(res)){
-                dbClearResult(res)
-            }
-            
-            if (!is.null(con)){
-                dbDisconnect(con)
-            }
-            
-            selectInput(inputId = "odbc_table_name", label = h3("Table Input"), 
-                        choices = c("'No tables selected'",paste0(list_of_schemas$TABLE_CATALOG,".",list_of_schemas$TABLE_SCHEMA,"." ,list_of_schemas$TABLE_NAME)),
-                        selected = NULL)
-            
-        } 
-        
-    })
+  })
+  
+  
+  #the output table ----
+  output$summary_table = DT::renderDataTable({
+    
+    # connect to ODBC data source 
+    con =   tryCatch({ dbConnect(odbc::odbc(),  input$odbc_source, encoding = 'windows-1252') 
+    }, error = function(e) {message(paste("Unable to connect to ODBC!")) })
     
     
-    #the output table 
-    output$summary_table = DT::renderDataTable({
+    # list available data sources 
+    list_of_tables =  tryCatch({ dbListTables(con)}, error = function(e){message("Unable to list tables!")})
+    
+    
+    # table name
+    curr_table =  tryCatch({ unlist(strsplit(input$odbc_table_name,"\\."))[3]}, 
+                           error = function(e){return(data.frame(Messages="Loading interface..."))},
+                           warning = function(e){return(data.frame(Messages="Loading interface..."))})
+    
+    # check if the current table exists in metadata 
+    if (curr_table %in% list_of_tables){
+      
+      
+      sql_query = get_summary_codes(input$odbc_table_name,type=input$checkMode, dbtype=input$checkDbtype, 
+                                    quote_table_name = input$checkQuote, clipboard_enabled = FALSE) #create SQL queries for summary
+      
+      res = tryCatch({dbSendQuery(con, sql_query)},
+                     error = function(e){return(data.frame(Messages="Wrong database type selection, or bad choice of quotation"))},
+                     warning = function(e){return(data.frame(Messages="Wrong database type selection, or bad choice of quotation"))}) 
+      
+      #get results
+      
+      output_table = tryCatch({dbFetch(res)},
+                              error = function(e){return(data.frame(Messages = "Wrong database type selection, or bad choice of quotation"))},
+                              warning = function(e){return(data.frame(Messages = "Wrong database type selection, or bad choice of quotation"))})  #fetch the sql queries to run, which will generate summary query  
+      
+      tryCatch({
         
-        # connect to ODBC data source 
-        con =   tryCatch({ dbConnect(odbc::odbc(),  input$odbc_source, encoding = 'windows-1252') 
-        }, error = function(e) {message(paste("Unable to connect to ODBC!")) })
+        dbClearResult(res)  #clear outputs   
         
+        summary_query = paste(output_table$CODES_DATA_SUMMARY, collapse = ' ')  #copy the summary query 1
+        print(paste("Table:",input$odbc_table_name))
+        print("Started Summarizing...")
         
-        # list available data sources 
-        list_of_tables =  tryCatch({ dbListTables(con)}, error = function(e){message("Unable to list tables!")})
+        res =   dbSendQuery(con, summary_query)  #run the summary query to fetch the summary table 
+        output_table = dbFetch(res); #fetch summary output
+        cat("Results fetched!\n\n\n")
         
+        names(output_table) = toupper(names(output_table))
         
-        # table name
-        curr_table =  tryCatch({ unlist(strsplit(input$odbc_table_name,"\\."))[3]}, 
-                               error = function(e){return(data.frame(Messages="Loading interface..."))},
-                               warning = function(e){return(data.frame(Messages="Loading interface..."))})
+        dbClearResult(res) #clear outputs 
+        dbDisconnect(con)
         
-        # check if the current table exists in metadata 
-        if (curr_table %in% list_of_tables){
-            
-            
-            sql_query = get_summary_codes(input$odbc_table_name,type=input$checkMode, dbtype=input$checkDbtype, 
-                                          quote_table_name = input$checkQuote, clipboard_enabled = FALSE) #create SQL queries for summary
-            
-            res = tryCatch({dbSendQuery(con, sql_query)},
-                           error = function(e){return(data.frame(Messages="Wrong database type selection, or bad choice of quotation"))},
-                           warning = function(e){return(data.frame(Messages="Wrong database type selection, or bad choice of quotation"))}) 
-            
-            #get results
-            
-            output_table = tryCatch({dbFetch(res)},
-                                    error = function(e){return(data.frame(Messages = "Wrong database type selection, or bad choice of quotation"))},
-                                    warning = function(e){return(data.frame(Messages = "Wrong database type selection, or bad choice of quotation"))})  #fetch the sql queries to run, which will generate summary query  
-            
-            tryCatch({
-                
-                dbClearResult(res)  #clear outputs   
-                
-                summary_query = paste(output_table$CODES_DATA_SUMMARY, collapse = ' ')  #copy the summary query 1
-                print(paste("Table:",input$odbc_table_name))
-                print("Started Summarizing...")
-                
-                res =   dbSendQuery(con, summary_query)  #run the summary query to fetch the summary table 
-                output_table = dbFetch(res); #fetch summary output
-                cat("Results fetched!\n\n\n")
-                
-                names(output_table) = toupper(names(output_table))
-                
-                dbClearResult(res) #clear outputs 
-                dbDisconnect(con)
-                
-                output_table$NUMVALUES=scales::comma(as.integer(output_table$NUMVALUES))
-                output_table$FREQNULL=scales::comma(as.integer(output_table$FREQNULL))
-                output_table$MINVAL=scales::comma(as.integer(output_table$MINVAL))
-                output_table$MAXVAL=scales::comma(as.integer(output_table$MAXVAL))
-                output_table$NUMMINVALS=scales::comma(as.integer(output_table$NUMMINVALS))
-                output_table$NUMMAXVALS=scales::comma(as.integer(output_table$NUMMAXVALS))
-                output_table$NUMUNIQUES=scales::comma(as.integer(output_table$NUMUNIQUES))
-                
-                if (input$checkMode == "advanced"){
-                    
-                    output_table$NUMMODES=scales::comma(as.integer(output_table$NUMMODES))
-                    output_table$MODEFREQ=scales::comma(as.integer(output_table$MODEFREQ))
-                    output_table$NUMANTIMODES=scales::comma(as.integer(output_table$NUMANTIMODES))
-                    output_table$ANTIMODEFREQ=scales::comma(as.integer(output_table$ANTIMODEFREQ))
-                    
-                }
-                
-                output_table[order(output_table$NUMVALUES,decreasing = TRUE),]  #output: summary table 
-                print(output_table[order(output_table$NUMVALUES,decreasing = TRUE),])
-                
-            }, 
-            error = function(e){data.frame(message="Wrong database type selection, or bad choice of quotation");},
-            warning = function(e){data.frame(message="Wrong database type selection, or bad choice of quotation")}) 
-            
-        } else {
-            if (nchar(input$odbc_source)>0){
-                data.frame(Messages = paste("The current table you are looking for doesn't exist in", input$odbc_source,"!", "Enter a valid table name."))
-            } else {
-                data.frame(Messages = "Please enter your ODBC connection name!")
-            }
-            
-            
+        output_table$NUMVALUES=scales::comma(as.integer(output_table$NUMVALUES))
+        output_table$FREQNULL=scales::comma(as.integer(output_table$FREQNULL))
+        
+        #output_table$MAXVAL = unlist(lapply(output_table$MAXVAL ,reformat_num)) # want to reformat numbers only
+        #output_table$MINVAL = unlist(lapply(output_table$MINVAL ,reformat_num)) # want to reformat numbers only
+        
+        output_table$NUMMINVALS=scales::comma(as.integer(output_table$NUMMINVALS))
+        output_table$NUMMAXVALS=scales::comma(as.integer(output_table$NUMMAXVALS))
+        output_table$NUMUNIQUES=scales::comma(as.integer(output_table$NUMUNIQUES))
+        print(names(output_table))
+        
+        if (input$checkMode == "advanced"){
+          
+          output_table$NUMMODES=scales::comma(as.integer(output_table$NUMMODES))
+          output_table$MODEFREQ=scales::comma(as.integer(output_table$MODEFREQ))
+          output_table$NUMANTIMODES=scales::comma(as.integer(output_table$NUMANTIMODES))
+          output_table$ANTIMODEFREQ=scales::comma(as.integer(output_table$ANTIMODEFREQ))
+          
         }
-    }, 
-    server=FALSE, 
-    extensions = "Buttons",
-    rownames= FALSE,
-    options = list(  info = FALSE,  
-                     lengthMenu = list(c( 50 ,100,-1), c(  "50","100","All" )),
-                     dom = 'lfrtiBp', 
-                     buttons = list(list(extend ="csv", text ='Download .CSV', 
-                                         filename = paste0(gsub("\\.","_",input$odbc_table_name),gsub("-| ","_",Sys.time()),'EST')),
-                                    list(extend ="pdf", text ='Download .PDF', 
-                                         title = paste0(gsub("\\.","_",input$odbc_table_name),gsub("-| ","_",Sys.time()),'EST'),
-                                         orientation = 'landscape',pageSize='A3'))
-    )
-    )  
-    
-    
+        
+        output_table[order(output_table$NUMVALUES,decreasing = TRUE),]  #output: summary table 
+        print(output_table[order(output_table$NUMVALUES,decreasing = TRUE),])
+        
+      }, 
+      error = function(e){data.frame(message="Wrong database type selection, or bad choice of quotation");},
+      warning = function(e){data.frame(message="Wrong database type selection, or bad choice of quotation")}) 
+      
+    } else {
+      if (nchar(input$odbc_source)>0){
+        data.frame(Messages = paste("The current table you are looking for doesn't exist in", input$odbc_source,"!", "Enter a valid table name."))
+      } else {
+        data.frame(Messages = "Please enter your ODBC connection name!")
+      }
+      
+      
+    }
+  }, 
+  server=FALSE, 
+  extensions = "Buttons",
+  rownames= FALSE,
+  options = list(  info = FALSE,  
+                   lengthMenu = list(c( 50 ,100,-1), c(  "50","100","All" )),
+                   dom = 'lfrtiBp', 
+                   buttons = list(list(extend ="csv", text ='Download .CSV', 
+                                       filename = paste0(gsub("\\.","_",input$odbc_table_name),gsub("-| ","_",Sys.time()),'EST')),
+                                  list(extend ="pdf", text ='Download .PDF', 
+                                       title = paste0(gsub("\\.","_",input$odbc_table_name),gsub("-| ","_",Sys.time()),'EST'),
+                                       orientation = 'landscape',pageSize='A3'))
+  )
+  )  
+  
+  
 }     
 
 
